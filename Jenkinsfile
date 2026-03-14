@@ -18,7 +18,25 @@ node{
             currentBuild.result = "FAILURE"
         }
     }
+	 stage('Maven Build') {
+        def mavenHome = tool name: 'maven3', type: 'maven'
+        sh "${mavenHome}/bin/mvn clean package"
+    }
 
-def mavenHome = tool name: 'maven3', type: 'maven'
-	{sh "${mavenHome}/bin/mvn clean package"}}
+	 stage('Docker Image Build'){
+        echo 'Creating Docker image'
+         sh "docker build -t ${dockerHubUser}/${containerName}:${tag} . --pull --no-cache"
+    } 
+	
+    stage('Publishing Image to DockerHub'){
+        echo 'Pushing the docker image to DockerHub'
+        withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
+		sh "docker login -u $dockerUser -p $dockerPassword"
+		sh "docker push $dockerUser/$containerName:$tag"
+		echo "Image push complete"
+        } 
+    }    
+	stage('Ansible Playbook Execution'){
+			sh "export ANSIBLE_HOST_KEY_CHECKING=False && ansible-playbook -i inventory.yaml containerDeploy.yaml -e httpPort=$httpPort -e containerName=$containerName -e dockerImageTag=$dockerHubUser/$containerName:$tag -e key_pair_path=/var/lib/jenkins/server.pem --become" 
+	}}
 
