@@ -19,8 +19,6 @@ node{
         }
     }
 
+def mavenHome = tool name: 'maven3', type: 'maven'
+	{sh "${mavenHome}/bin/mvn clean package"}}
 
-stage('Maven Build'){
-        sh "mvn clean package"        
-    }
-}
