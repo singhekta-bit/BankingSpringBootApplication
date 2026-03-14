@@ -18,9 +18,9 @@ node{
             currentBuild.result = "FAILURE"
         }
     }
-}
+
 
 stage('Maven Build'){
         sh "mvn clean package"        
     }
-
+}
