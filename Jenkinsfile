@@ -43,7 +43,7 @@ node {
     stage('Ansible Playbook Execution'){
         withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]) {
             // Using triple double-quotes (""") allows you to use ${variable} syntax directly
-            sh "export ANSIBLE_HOST_KEY_CHECKING=False && ansible-playbook -i inventory.yaml containerDeploy.yaml -e httpPort=$httpPort -e containerName=$containerName -e dockerImageTag=$dockerHubUser/$containerName:$tag -e ansible_password='${AZURE_PASS}' --become"
+            sh "export ANSIBLE_HOST_KEY_CHECKING=False && ansible-playbook -i inventory.yaml containerDeploy.yaml -e httpPort=$httpPort -e containerName=$containerName -e dockerImageTag=$dockerHubUser/$containerName:$tag -e ansible_password='${AZURE_PASS}' -e ansible_become_password='${AZURE_PASS}' --become"
     
         }
     }
