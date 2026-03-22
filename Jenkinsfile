@@ -37,7 +37,9 @@ node{
         } 
     }    
 	stage('Ansible Playbook Execution'){
-        sh '''
+		steps {
+ withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]){
+			sh '''
         export ANSIBLE_HOST_KEY_CHECKING=False
         ansible-playbook -i inventory.yaml containerDeploy.yaml \
         -e httpPort=''' + httpPort + ''' \
@@ -48,4 +50,4 @@ node{
         --become
         '''
 	}}
-
+	}
