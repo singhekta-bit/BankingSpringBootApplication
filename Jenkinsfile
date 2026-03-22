@@ -1,53 +1,61 @@
-node{
-    def tag, dockerHubUser, containerName, httpPort = ""
+node {
+    // 1. Def variables properly
+    def tag = "3.0"
+    def dockerHubUser = ""
+    def containerName = "bankingapp"
+    def httpPort = "8989"
+
     stage('Prepare Environment'){
         echo 'Initialize Environment'
-        tag="3.0"
-	withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
-		dockerHubUser="$dockerUser"
+        // Retrieve dockerUser from credentials and assign to variable
+        withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
+            dockerHubUser = "${dockerUser}"
         }
-	containerName="bankingapp"
-	httpPort="8989"
     }
+
     stage('Code Checkout'){
-        try{
+        try {
             checkout scm
-        }
-        catch(Exception e){
-            echo 'Exception occured in Git Code Checkout Stage'
+        } catch(Exception e) {
+            echo "Exception occurred in Git Code Checkout: ${e.message}"
             currentBuild.result = "FAILURE"
+            throw e // Stop execution on failure
         }
     }
-	 stage('Maven Build') {
+
+    stage('Maven Build') {
         def mavenHome = tool name: 'maven3', type: 'maven'
         sh "${mavenHome}/bin/mvn clean package"
     }
 
-	 stage('Docker Image Build'){
+    stage('Docker Image Build'){
         echo 'Creating Docker image'
-         sh "docker build -t ${dockerHubUser}/${containerName}:${tag} . --pull --no-cache"
+        sh "docker build -t ${dockerHubUser}/${containerName}:${tag} . --pull --no-cache"
     } 
 	
     stage('Publishing Image to DockerHub'){
         echo 'Pushing the docker image to DockerHub'
         withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
-		sh "docker login -u $dockerUser -p $dockerPassword"
-		sh "docker push $dockerUser/$containerName:$tag"
-		echo "Image push complete"
+            // Securely pass password via stdin to avoid exposing it in process logs
+            sh "echo '${dockerPassword}' | docker login -u ${dockerUser} --password-stdin"
+            sh "docker push ${dockerHubUser}/${containerName}:${tag}"
+            echo "Image push complete"
         } 
     }    
-	stage('Ansible Playbook Execution'){
-		steps {
- withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]){
-			sh '''
-        export ANSIBLE_HOST_KEY_CHECKING=False
-        ansible-playbook -i inventory.yaml containerDeploy.yaml \
-        -e httpPort=''' + httpPort + ''' \
-        -e containerName=''' + containerName + ''' \
-        -e dockerImageTag=''' + dockerHubUser + '/' + containerName + ':' + tag + ''' \
-        -e key_pair_path=/var/lib/jenkins/server.pem \
-        -e ansible_password=$AZURE_PASS \
-        --become
-        '''
-	}}
-	}
+
+    stage('Ansible Playbook Execution'){
+        // REMOVED 'steps' block as it's invalid in Scripted Pipeline
+        withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]) {
+            sh """
+                export ANSIBLE_HOST_KEY_CHECKING=False
+                ansible-playbook -i inventory.yaml containerDeploy.yaml \
+                -e httpPort=${httpPort} \
+                -e containerName=${containerName} \
+                -e dockerImageTag=${dockerHubUser}/${containerName}:${tag} \
+                -e key_pair_path=/var/lib/jenkins/server.pem \
+                -e ansible_password='${AZURE_PASS}' \
+                --become
+            """
+        }
+    }
+}
