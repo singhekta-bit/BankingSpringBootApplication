@@ -13,5 +13,5 @@ azure
 172.203.226.202
 
 [azure:vars]
-ansible_ssh_user=devops
+ansible_ssh_user=azureuser
 ansible_ssh_pass="{{ ansible_password }}"
