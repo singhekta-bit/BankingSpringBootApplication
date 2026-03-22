@@ -1,5 +1,4 @@
 node {
-    // 1. Def variables properly
     def tag = "3.0"
     def dockerHubUser = ""
     def containerName = "bankingapp"
@@ -7,7 +6,6 @@ node {
 
     stage('Prepare Environment'){
         echo 'Initialize Environment'
-        // Retrieve dockerUser from credentials and assign to variable
         withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
             dockerHubUser = "${dockerUser}"
         }
@@ -19,7 +17,7 @@ node {
         } catch(Exception e) {
             echo "Exception occurred in Git Code Checkout: ${e.message}"
             currentBuild.result = "FAILURE"
-            throw e // Stop execution on failure
+            throw e 
         }
     }
 
@@ -36,7 +34,6 @@ node {
     stage('Publishing Image to DockerHub'){
         echo 'Pushing the docker image to DockerHub'
         withCredentials([usernamePassword(credentialsId: 'dockerHubAccount', usernameVariable: 'dockerUser', passwordVariable: 'dockerPassword')]) {
-            // Securely pass password via stdin to avoid exposing it in process logs
             sh "echo '${dockerPassword}' | docker login -u ${dockerUser} --password-stdin"
             sh "docker push ${dockerHubUser}/${containerName}:${tag}"
             echo "Image push complete"
@@ -44,16 +41,10 @@ node {
     }    
 
     stage('Ansible Playbook Execution'){
-       withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]) {
-    sh  '''...'''
-        export ANSIBLE_HOST_KEY_CHECKING=False
-        ansible-playbook -i inventory.yaml containerDeploy.yaml \
-        -e httpPort=''' + httpPort + ''' \
-        -e containerName=''' + containerName + ''' \
-        -e dockerImageTag=''' + dockerHubUser + '/' + containerName + ':' + tag + ''' \
-        -e key_pair_path=/var/lib/jenkins/server.pem \
-        -e ansible_password="${AZURE_PASS}" \
-        --become
-    '''
+        withCredentials([string(credentialsId: 'ssh_password', variable: 'AZURE_PASS')]) {
+            // Using triple double-quotes (""") allows you to use ${variable} syntax directly
+            sh "export ANSIBLE_HOST_KEY_CHECKING=False && ansible-playbook -i inventory.yaml containerDeploy.yaml -e httpPort=$httpPort -e containerName=$containerName -e dockerImageTag=$dockerHubUser/$containerName:$tag -e -e ansible_password='${AZURE_PASS}' --become"
+    
+        }
+    }
 }
-	}
